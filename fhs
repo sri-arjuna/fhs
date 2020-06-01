@@ -1,0 +1,323 @@
+#!/usr/bin/env bash
+#
+# FHS = File Hierarchy System
+# ---------------------------
+# For full info, see: http://www.pathname.com/fhs/pub/fhs-2.3.html
+# This file checks the local system for FHS compatibility.
+# This file checks the local system dirs and returns them in a FHS compatibe way.
+# 
+# 
+#
+# Usage-Intention:
+# ----------------
+# This file can be used to retrieve the used system directories.
+# It should be used to verify expected directories.
+#
+#
+# Variables
+#
+	script_version="0.1"
+	script_name="${0##*/}"
+	script_license="MIT"
+	USAGE="$script_name [-l|--list] [--list-dirnames] [--list-fhs] [--write-rc] [--default] [DIRNAME]"
+	declare -A FHS
+	FHS[index]="BOOT BIN SBIN DEV CFG X11 HOME LIB LIB64 MEDIA MNT OPT PROC ROOT SRV TMP USR VAR SYS OPTCFG DATAROOT INCLUDE LOCAL LOCALE SRC SGMLCFG SGMLDATA XMLCFG XMLDATA CACHE CRASH LOCK LOG MAIL RUN SPOOL CRON DICT DOC MAN INFO MISC GRUBD GRUBEFI GRUBCFG"
+	declare HOME="${HOME:-$(echo eval ~$USER)}"
+	declare FHSRC="$HOME/.fhs"
+	declare skip_parse=false
+	declare skip_source=false
+	declare	action=""
+#
+# Set Default values
+#
+	# Static files of the boot loader
+	FHS[BOOT]="/boot"
+	# Essential user command binaries (for use by all users)
+	FHS[BIN]="/usr/bin"
+	# System binaries
+	FHS[SBIN]="/usr/sbin"
+	# Device files
+	FHS[DEV]="/dev"
+	# Host-specific system configuration
+	FHS[CFG]="/etc"
+	# User home directories (optional)
+	FHS[HOME]="/home"
+	# Essential shared libraries and kernel modules
+	FHS[LIB]="/usr/lib"
+	# Essential shared libraries and kernel modules
+	FHS[LIB64]="/usr/lib64"
+	# Mount point for removeable media
+	FHS[MEDIA]="/media"
+	# Mount point for a temporarily mounted filesystem
+	FHS[MNT]="/mnt"
+	#  Add-on application software packages
+	FHS[OPT]="/opt"
+	# Where to find process info
+	FHS[PROC]="/proc"
+	# Home directory for the root user (optional)
+	FHS[ROOT]="/root"
+	# Data for services provided by this system
+	FHS[SRV]="/srv"
+	# Temporary files
+	FHS[TMP]="/tmp"
+	# Shareable, read-only data
+	FHS[USR]="/usr"
+	# Variable data files
+	FHS[VAR]="/var"
+
+	# -- UNKNWON -- Fedora 22
+	FHS[SYS]="/sys"
+#
+#	Structure	:	FHS[CFG] childs
+#
+	# Configuration files for SGML (optional)
+	FHS[SGMLCFG]="${FHS[CFG]}/sgml"
+	# Data files for SGML (optional)
+	FHS[SGMLDATA]="${FHS[VAR]}/sgml"
+	# Configuration for the X Window System (optional)
+	FHS[X11]="${FHS[CFG]}/X11"
+	# Configuration files for XML (optional)
+	FHS[XMLCFG]="${FHS[CFG]}/xml"
+	# Data files for XML (optional)
+	FHS[XMLDATA]="${FHS[VAR]}/xml"
+	# Configuration files for /opt
+	FHS[OPTCFG]="${FHS[CFG]}/opt"
+#
+#	Structure	:	FHS[USR] childs
+#
+	# Architecture-independent data
+	FHS[DATAROOT]="${FHS[USR]}/share"
+	# Architecture-independent data
+	FHS[DATA]="${FHS[DATAROOT]}"
+	# Directory for standard include files.
+	FHS[INCLUDE]="${FHS[USR]}/include"
+	# Used by the system administrator when installing software locally, when its not available by <PACKAGE MAMAGER>
+	FHS[LOCAL]="${FHS[USR]}/local"
+	# Base of language specific LC_MESSAGES
+	FHS[LOCALE]="${FHS[DATA]}/locale"
+	# Source code (optional)
+	FHS[SRC]="${FHS[USR]}/src"
+	# Most user commands
+	#FHS[USRBIN]="${FHS[USR]}/bin"
+	# Non-essential standard system binaries
+	#FHS[USRSBIN]="${FHS[USR]}/sbin"
+#
+#	Structure	:	FHS[VAR] childs
+#
+	# Application Cache
+	FHS[CACHE]="${FHS[VAR]}/cache"
+	# System crash dumps (optional)
+	FHS[CRASH]="${FHS[VAR]}/crash"
+	# Variable state information
+	FHS[VARLIB]="${FHS[VAR]}/lib"
+	# Locks files
+	FHS[LOCK]="${FHS[VAR]}/lock"
+	# Log files and directories
+	FHS[LOG]="${FHS[VAR]}/log"
+	# User mailbox files (optional)
+	FHS[MAIL]="${FHS[VAR]}/mail"
+	# Run-time variable data
+	FHS[RUN]="${FHS[VAR]}/run"
+	# Application spool data
+	FHS[SPOOL]="${FHS[VAR]}/spool"
+	# Cron and 'at' jobs
+	FHS[CRON]="${FHS[SPOOL]}/cron"
+#
+#	Structure	:	FHS[DATAROOT] childs
+#
+	# Word lists (optional)
+	FHS[DICT]="${FHS[DATAROOT]}/dict"
+	# Contains application docs
+	FHS[DOC]="${FHS[DATAROOT]}/doc"
+	# Manual pages
+	FHS[MAN]="${FHS[DATAROOT]}/man"
+	# Info pages
+	FHS[INFO]="${FHS[DATAROOT]}/info"
+	# Miscellaneous architecture-independent data
+	FHS[MISC]="${FHS[DATAROOT]}/misc"
+	FHS[HTML]="${FHS[DOC]}"
+#
+# 	Structure	:	FHS[GRUB*]
+#
+	FHS[GRUBD]="${FHS[CFG]}/grub.d"
+	FHS[GRUBEFI]="${FHS[BOOT]}/efi"
+	FHS[GRUBCFG]="${FHS[BOOT]}/grub2"
+#
+# Lists
+# These lists are only used when checking for the default values fails
+#
+	FHS_DIRLIST_BOOT="/boot"
+	FHS_DIRLIST_BIN="/usr/bin /bin"
+	FHS_DIRLIST_SBIN="/usr/sbin /sbin"
+	FHS_DIRLIST_DEV="/dev"
+	FHS_DIRLIST_CFG="/etc"
+	FHS_DIRLIST_X11="/etc/X11 /etc/x11 /etc/X /etc/x"
+	FHS_DIRLIST_MEDIA="/media"
+	FHS_DIRLIST_MNT="/mnt"
+	FHS_DIRLIST_OPT="/opt"
+	FHS_DIRLIST_OPTCFG="/opt/cfg"
+	FHS_DIRLIST_OPTBIN="/opt/bin"
+	FHS_DIRLIST_OPTSBIN="/opt/sbin"
+	FHS_DIRLIST_PROC="/proc"
+	FHS_DIRLIST_ROOT="/root"
+	FHS_DIRLIST_SRV="/srv"
+	FHS_DIRLIST_TMP="/tmp"
+	FHS_DIRLIST_USR="/usr"
+	FHS_DIRLIST_VAR="/var"
+	FHS_DIRLIST_SYS="/sys"
+	FHS_DIRLIST_SGMLCFG="/etc/sgml"
+	FHS_DIRLIST_SGMLDATA="/usr/share/sgml"
+	FHS_DIRLIST_XMLCFG="/etc/xml"
+	FHS_DIRLIST_XMLDATA="/usr/share/xml"
+	FHS_DIRLIST_HOME="/home /Users /Home /users"
+	FHS_DIRLIST_LIB32="/usr/lib /lib"
+	FHS_DIRLIST_LIB64="/usr/lib64 /lib64"
+	FHS_DIRLIST_DATAROOT="/usr/share"
+	FHS_DIRLIST_INCLUDE="/usr/include"
+	FHS_DIRLIST_LOCAL="/usr/local"
+	FHS_DIRLIST_LOCALE="/usr/share/locale"
+	FHS_DIRLIST_SRC="/usr/src"
+	FHS_DIRLIST_CACHE="/var/cache"
+	FHS_DIRLIST_CRASH="/var/crash"
+	FHS_DIRLIST_LOCK="/var/lock"
+	FHS_DIRLIST_LOG="/var/log"
+	FHS_DIRLIST_MAIL="/var/mail"
+	FHS_DIRLIST_RUN="/var/run"
+	FHS_DIRLIST_SPOOL="/var/spool"
+	FHS_DIRLIST_CRON="/var/spool/cron"
+	FHS_DIRLIST_DICT="/var/share/dict"
+	FHS_DIRLIST_DOC="/var/share/doc"
+	FHS_DIRLIST_MAN="/var/share/man"
+	FHS_DIRLIST_INFO="/var/share/info"
+	FHS_DIRLIST_MISC="/var/share/misc"
+	FHS_DIRLIST_GRUBD="/etc/grub.d"
+	FHS_DIRLIST_GRUBEFI="/boot/efi"
+	FHS_DIRLIST_GRUBCFG="/boot/grub2 /boot/grub"
+	
+#
+# Functions
+#
+	fhs.usage() { printf '%s\n' "${script_name}-${script_version} by Simon Arjuna Erat (sea)" "$USAGE" ; exit 1 ; }
+	fhs.rc.write() { #
+	# Writes an RC file
+	#
+		# Create file 
+		builtin echo "#!/usr/bin/env bash" > "$FHSRC"
+		local tmp_str=""
+		export skip_source=true
+		fhs.list n  >> "$FHSRC"
+	}
+	fhs.listdirs() { #
+	# Prints the list of dir names
+	#
+		printf '%s\n' ${FHS[index]}
+	}
+	fhs.list() { #
+	# Lists the Dirnames and their values
+	#
+		local tmp_str="" tmp_str2=""
+		
+		if [[ -f "$FHSRC" ]] && ! $skip_source
+		then	# Use the RC file
+			source "$FHSRC"
+		fi			
+		for item in ${FHS[index]}
+		do
+			# Skip index
+			[[ "$item" == "index" ]] && continue
+			# Prepare value name
+			[[ -n "$1" ]] && \
+				tmp_str="FHS_${item}_DIR=" || \
+				tmp_str="$item = "
+			# Output
+			if $skip_parse
+			then	# Show default
+				builtin echo "${tmp_str}${FHS[$item]}"
+			else	# Parse - or not?
+				if [[ -f "$FHSRC" ]] && ! $skip_source
+				then	# Use the RC file
+					tmp_str2=$(builtin echo ${tmp_str/=})
+					if [[ -n "$1" ]]
+					then
+						builtin echo "${tmp_str}\"${!tmp_str2}\""
+					else
+						tmp_str2="FHS_${tmp_str2}_DIR"
+						builtin echo "${tmp_str}${!tmp_str2}"
+					fi
+				else	# Default handling
+					[[ -n "$1" ]] && \
+						builtin echo "${tmp_str}\"$(fhs.parse.this $item)\"" || \
+						builtin echo "${tmp_str}$(fhs.parse.this $item)"
+				fi
+			fi
+		done
+	}
+	fhs.parse.this() { # DIRNAME
+	# Parse just this one DIRNAME
+	# Returns path of DIRNAME
+		# Return false if DIRNAME is not a valid argument
+		builtin echo ${FHS[@]} | grep -q "$1" || return 1
+		# Prepare variables for modifications
+		local var_dir="${FHS[$1]}"
+		local var_list="FHS_DIRLIST_${1}"
+		
+		if [[ -d "$var_dir" ]]
+		then	# Default dir exists
+			builtin echo "$var_dir"
+			# Return success
+			return 0
+		fi
+		
+		# Default dir was not found, parse list
+		for item in ${!var_list}
+		do
+			# Does this exist?
+			if [[ -d "$item" ]]
+			then
+				builtin echo "$item"
+				# Return success
+				return 0
+			fi
+		done
+		
+		# Nothing was found
+		builtin echo ""
+		return 1
+	}
+#
+# Catching Arguments
+#
+	while :
+	do
+		case "$1" in
+		-h|--help|-\?) 	fhs.usage ;;
+		--default)	skip_parse=true ;; # set testy	;;
+		-l|--list)	action="fhs.list"	;;
+		--list-fhs)	action="fhs.list fhs"	;;
+		--list-dirnames|--listdirnames)	action="fhs.listdirs"	;;
+		--write-rc)	action="fhs.rc.write"	;;
+		--)		shift ; break	;;
+		--*)		fhs.usage ;;
+		*)		break	;;
+		esac
+		shift
+	done
+#
+# Action & Display
+#
+	# If no action is defined, we shall do default behavior
+	if [[ -z "$action" ]]
+	then	# In this case, we would require arguments....
+		[[ -z "${@}" ]] && fhs.usage
+		for arg in "${@}"
+		do
+			fhs.parse.this "${arg^^}"
+		done
+	elif [[ -n "$action" ]]
+	then	# Just execute it
+		$action "${@}"
+	else	# Improper handling
+		fhs.usage
+	fi
+
+exit $?
