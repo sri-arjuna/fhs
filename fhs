@@ -2,26 +2,37 @@
 #
 # FHS = File Hierarchy System
 # ---------------------------
-# For full info, see: http://www.pathname.com/fhs/pub/fhs-2.3.html
-# This file checks the local system for FHS compatibility.
-# This file checks the local system dirs and returns them in a FHS compatibe way.
-# 
-# 
+# This script aims to assist in path verification according to this standard.
+# For the full documentation, please see: http://www.pathname.com/fhs/pub/fhs-2.3.html
+# I am in no affiliated relation with that webpage or any organisation that defines this standard.
 #
-# Usage-Intention:
-# ----------------
-# This file can be used to retrieve the used system directories.
-# It should be used to verify expected directories.
+# In the means to support freedom, it also aims to be a 'translator' beween systems following
+# the standard and systems that might try a more custom approach with an LFS (just as example).
+# This said, not only can it be used to create an empty systemtree structure according to the FHS standard - 
+# it can even create a customized variant that can be saved in a template file for reference.
+#
+# But the main reason for this file is to either to check wether a "default defined path" is found, 
+# or if a  provided path is part of a 'default defined path'
+# 
+# 
 #
 #
 # Variables
 #
-	script_version="0.1"
+	script_version="0.1b"
 	script_name="${0##*/}"
 	script_license="MIT"
 	USAGE="$script_name [-l|--list] [--list-dirnames] [--list-fhs] [--write-rc] [--default] [DIRNAME]"
+	HELP="
+-l|--list	Print a Makefile compatible assignment list
+--list-dirnames	Prints the list of available variables names with this FHS script.
+--list-fhs	Prints the FHS paths / RC-File
+--write-rc	Writes the RC-File, use --list-fhs to verify it is what you want.
+--default	Skip the RC-file if available and show default values.
+"
 	declare -A FHS
 	FHS[index]="BOOT BIN SBIN DEV CFG X11 HOME LIB LIB64 MEDIA MNT OPT PROC ROOT SRV TMP USR VAR SYS OPTCFG DATAROOT INCLUDE LOCAL LOCALE SRC SGMLCFG SGMLDATA XMLCFG XMLDATA CACHE CRASH LOCK LOG MAIL RUN SPOOL CRON DICT DOC MAN INFO MISC GRUBD GRUBEFI GRUBCFG"
+	# This seems to work on all systems I've encountered so far
 	declare HOME="${HOME:-$(echo eval ~$USER)}"
 	declare FHSRC="$HOME/.fhs"
 	declare skip_parse=false
@@ -197,15 +208,18 @@
 #
 # Functions
 #
-	fhs.usage() { printf '%s\n' "${script_name}-${script_version} by Simon Arjuna Erat (sea)" "$USAGE" ; exit 1 ; }
+	fhs.usage() { printf '%s\n' "${script_name} (${script_version})" "$USAGE" ; exit 1 ; }
+	fhs.help() { printf '%s\n' "${script_name} (${script_version}) by Simon Arjuna Erat (sea)" "$HELP" ; exit 1 ; }
 	fhs.rc.write() { #
 	# Writes an RC file
 	#
 		# Create file 
 		builtin echo "#!/usr/bin/env bash" > "$FHSRC"
 		local tmp_str=""
+		local org_skip=$skip_source
 		export skip_source=true
 		fhs.list n  >> "$FHSRC"
+		export skip_source=$org_skip
 	}
 	fhs.listdirs() { #
 	# Prints the list of dir names
@@ -290,7 +304,7 @@
 	while :
 	do
 		case "$1" in
-		-h|--help|-\?) 	fhs.usage ;;
+		-h|--help|-\?) 	fhs.help ; exit 0 ;;
 		--default)	skip_parse=true ;; # set testy	;;
 		-l|--list)	action="fhs.list"	;;
 		--list-fhs)	action="fhs.list fhs"	;;
